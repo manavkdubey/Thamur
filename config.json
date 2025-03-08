@@ -1,0 +1,6 @@
+{
+  "user_agent": "Thamur/1.0",
+  "max_depth": 3,
+  "max_threads": 10,
+  "timeout": 5000
+}
