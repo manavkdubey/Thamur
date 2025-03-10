@@ -1,4 +1,5 @@
 use crawler::config::load_config;
+use crawler::modules::fetcher::client::Fetcher;
 use reqwest::{self, Client};
 use select::document::Document;
 use select::predicate::Name;
