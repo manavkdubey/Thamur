@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::{MutexGuard, PoisonError, RwLockReadGuard, RwLockWriteGuard};
 use thiserror::Error;
 use tracing::error;
 
@@ -23,6 +24,12 @@ pub enum CrawlerError {
     HttpError(reqwest::StatusCode),
     #[error("I/O error: {0}")]
     IoError(std::io::Error),
+    #[error("Mutex lock poisoned")]
+    MutexPoisonError,
+    #[error("RwLock read lock poisoned")]
+    RwLockReadPoisonError,
+    #[error("RwLock write lock poisoned")]
+    RwLockWritePoisonError,
     #[error("Other error: {0}")]
     Other(String),
 }
@@ -37,5 +44,22 @@ impl From<reqwest::Error> for CrawlerError {
     fn from(e: reqwest::Error) -> Self {
         error!("Failed to make HTTP request: {}", e);
         CrawlerError::HyperError(e)
+    }
+}
+impl<T> From<PoisonError<MutexGuard<'_, T>>> for CrawlerError {
+    fn from(_: PoisonError<MutexGuard<'_, T>>) -> Self {
+        CrawlerError::MutexPoisonError
+    }
+}
+
+impl<T> From<PoisonError<RwLockReadGuard<'_, T>>> for CrawlerError {
+    fn from(_: PoisonError<RwLockReadGuard<'_, T>>) -> Self {
+        CrawlerError::RwLockReadPoisonError
+    }
+}
+
+impl<T> From<PoisonError<RwLockWriteGuard<'_, T>>> for CrawlerError {
+    fn from(_: PoisonError<RwLockWriteGuard<'_, T>>) -> Self {
+        CrawlerError::RwLockWritePoisonError
     }
 }

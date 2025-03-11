@@ -29,10 +29,11 @@ async fn test_fetch(url: &str) -> Result<CrawledData, Box<dyn std::error::Error>
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::task::spawn(async move {
-        let mut pool = ThreadPool::new();
-        pool.execute(|| println!("Hello from thread!")).await;
+        let pool = ThreadPool::new();
+        let _ = pool.execute(|| println!("Hello from thread1!")).await;
+        let _ = pool.execute(|| println!("Hello from thread2!")).await;
+
         drop(pool);
-        dbg!("pool dropped");
     });
     let res = reqwest::get("https://example.com").await?;
     let config = load_config("config.json")?;

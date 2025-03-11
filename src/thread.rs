@@ -36,7 +36,9 @@ impl ThreadPool {
 
     pub async fn shutdown(&mut self) {
         for handle in self.workers.drain(..) {
-            handle.await;
+            if let Err(e) = handle.await {
+                tracing::error!("Error waiting for thread to complete: {}", e);
+            }
         }
     }
 }
@@ -54,7 +56,9 @@ impl Drop for ThreadPool {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
                 for worker in workers {
-                    let _ = worker.await;
+                    if let Err(e) = worker.await {
+                        tracing::error!("Error waiting for thread to complete: {}", e);
+                    }
                 }
             });
         }

@@ -2,7 +2,8 @@ use flume::unbounded;
 use std::thread;
 use std::time::Duration;
 
-enum Task {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Task {
     CrawlUrl(String),
 }
 impl Task {

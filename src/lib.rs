@@ -6,6 +6,7 @@ pub mod modules {
 }
 pub mod config;
 pub mod error;
+pub mod state;
 pub mod task;
 pub mod thread;
 pub mod validator;
