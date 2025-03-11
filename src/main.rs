@@ -1,5 +1,5 @@
-use crawler::config::load_config;
 use crawler::modules::fetcher::client::Fetcher;
+use crawler::{config::load_config, thread::ThreadPool};
 use reqwest::{self, Client};
 use select::document::Document;
 use select::predicate::Name;
@@ -28,6 +28,12 @@ async fn test_fetch(url: &str) -> Result<CrawledData, Box<dyn std::error::Error>
 }
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tokio::task::spawn(async move {
+        let mut pool = ThreadPool::new();
+        pool.execute(|| println!("Hello from thread!")).await;
+        drop(pool);
+        dbg!("pool dropped");
+    });
     let res = reqwest::get("https://example.com").await?;
     let config = load_config("config.json")?;
     dbg!(&config);

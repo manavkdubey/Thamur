@@ -41,10 +41,18 @@ pub fn parse_html_links(html: &str, base_url: &str) -> Result<Vec<String>, Crawl
     Ok(links)
 }
 
-pub fn normalize_url(base_url: &str, relative_url: &str) -> Result<String, url::ParseError> {
+pub fn normalize_url(base_url: &str, relative_url: &str) -> Result<url::Url, url::ParseError> {
     let base = url::Url::parse(base_url)?;
-    let absolute = base.join(relative_url)?;
-    Ok(absolute.to_string())
+    let normalized = match url::Url::parse(relative_url).map(|r| r.host().map(|h| h.to_string())) {
+        Ok(_) => url::Url::parse(relative_url)?,
+        Err(_) => base.join(relative_url)?,
+    };
+    let validator = UrlValidator::new();
+    if validator.is_valid(&normalized) {
+        Ok(normalized)
+    } else {
+        Err(url::ParseError::RelativeUrlWithoutBase)
+    }
 }
 
 mod tests {
@@ -101,14 +109,103 @@ mod tests {
     fn test_normalize_url() {
         let base_url = "http://test.com/normalize";
         let relative_url = "/relative";
-        let expected_url = "http://test.com/relative";
+        let expected_url = url::Url::parse("http://test.com/relative").unwrap();
         assert_eq!(normalize_url(base_url, relative_url).unwrap(), expected_url);
     }
     #[test]
     fn test_normalize_url_with_scheme() {
         let base_url = "http://test.com/normalize";
         let relative_url = "https://example.com/absolute";
-        let expected_url = "https://example.com/absolute";
+        let expected_url = url::Url::parse("https://example.com/absolute").unwrap();
         assert_eq!(normalize_url(base_url, relative_url).unwrap(), expected_url);
+    }
+    #[test]
+    fn test_normalize_url_with_query() {
+        let base_url = "http://test.com/normalize";
+        let relative_url = "/relative?query=param";
+        let expected_url = url::Url::parse("http://test.com/relative?query=param").unwrap();
+        assert_eq!(normalize_url(base_url, relative_url).unwrap(), expected_url);
+    }
+    #[test]
+    fn test_normalize_url_with_fragment() {
+        let base_url = "http://example.com/some/path/";
+        let relative_url = "../example.html";
+        let expected_url = url::Url::parse("http://example.com/some/example.html").unwrap();
+        assert_eq!(normalize_url(base_url, relative_url).unwrap(), expected_url);
+    }
+    #[test]
+    fn test_url_normalizer() {
+        // Test cases
+        test_normalizer(
+            "http://example.com/current/page.html",
+            "example.html",
+            Some("http://example.com/current/example.html"),
+        );
+
+        test_normalizer(
+            "http://example.com/current/",
+            "../example.html",
+            Some("http://example.com/example.html"),
+        );
+
+        test_normalizer(
+            "http://example.com/",
+            "/page",
+            Some("http://example.com/page"),
+        );
+
+        test_normalizer(
+            "http://example.com/",
+            "http://example.com/absolute",
+            Some("http://example.com/absolute"),
+        );
+
+        test_normalizer(
+            "http://example.com/",
+            "//example.com/protocol-relative",
+            Some("http://example.com/protocol-relative"),
+        );
+
+        test_normalizer(
+            "http://example.com/",
+            "./relative",
+            Some("http://example.com/relative"),
+        );
+
+        test_normalizer(
+            "http://example.com/current/",
+            "../parent",
+            Some("http://example.com/parent"),
+        );
+
+        test_normalizer(
+            "http://example.com/current/",
+            "../../parent",
+            Some("http://example.com/parent"),
+        );
+
+        test_normalizer(
+            "http://example.com/current/",
+            "../../../parent",
+            Some("http://example.com/parent"),
+        );
+
+        test_normalizer(
+            "http://example.com/current/",
+            "http://example.com/absolute",
+            Some("http://example.com/absolute"),
+        );
+
+        test_normalizer("http://example.com/current/", "invalid://invalid", None);
+    }
+
+    fn test_normalizer(base_url: &str, relative_url: &str, expected: Option<&str>) {
+        let normalized = normalize_url(base_url, relative_url);
+        match expected {
+            Some(expected) => {
+                assert_eq!(normalized.as_ref().map(|s| s.as_str()).ok(), Some(expected))
+            }
+            None => assert!(normalized.is_err()),
+        }
     }
 }
