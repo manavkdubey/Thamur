@@ -1,8 +1,9 @@
 use reqwest::{Client, StatusCode};
-use std::time::Duration;
+use std::{f32::consts::E, sync::OnceLock, time::Duration};
 
 use crate::{
     error::CrawlerError,
+    limiter::{get_rate_limiter, RateLimiter},
     modules::storage::state::{get_global_instance, is_url_processed, mark_url_processed},
 };
 
@@ -26,9 +27,33 @@ impl Fetcher {
         // if is_url_processed(url) {
         //     todo!()
         // }
+        let rate_limiter = get_rate_limiter();
+        let mut retries = 0;
+        let max_retries = 5;
+
+        loop {
+            match rate_limiter.check_tokens() {
+                Ok(_) => break,
+                Err(CrawlerError::RateLimitError(wait_time)) => {
+                    if retries >= max_retries {
+                        return Err(CrawlerError::RateLimitError(wait_time));
+                    }
+                    let backoff_time = wait_time * (retries + 1) as u64;
+                    tracing::warn!(
+                        "Rate limit exceeded. Retrying in {} seconds...",
+                        backoff_time
+                    );
+                    tokio::time::sleep(Duration::from_secs(backoff_time)).await;
+                    retries += 1;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
         let response = self
             .client
             .get(url)
+            .timeout(Duration::new(10, 0))
             .header("UserAgent", "Thamur/1.0")
             .send()
             .await

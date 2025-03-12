@@ -38,11 +38,14 @@ async fn test_fetch(url: &str) -> Result<CrawledData, Box<dyn std::error::Error>
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pool = ThreadPool::new(1);
 
-    let _ = pool
-        .execute(|| async move {
-            crawl_url("http://books.toscrape.com").await;
-        })
-        .await;
+    pool.execute(|| async move {
+        crawl_url("http://books.toscrape.com").await;
+    })
+    .await?;
+    pool.execute(|| async move {
+        crawl_url("https://www.robotstxt.org").await;
+    })
+    .await?;
 
     pool.shutdown().await;
 
@@ -61,8 +64,7 @@ async fn crawl_url(url: &str) -> Result<CrawledData, Box<dyn std::error::Error>>
     mark_url_processed(url.to_string());
 
     let urls = parse_html_links(&html, url)?;
-    for url in urls {
-        dbg!(&url);
+    for url in &urls {
         let (data, status, content) = fetcher.fetch_page(&url).await?;
         let storage = Storage::new(StorageConfig::from(
             &get_storage_config_path(),
@@ -76,12 +78,12 @@ async fn crawl_url(url: &str) -> Result<CrawledData, Box<dyn std::error::Error>>
             crawled_at: Utc::now(),
         };
         storage.save_data(&data_entry)?;
-        mark_url_processed(url);
+        mark_url_processed(url.to_owned());
     }
 
     Ok(CrawledData {
         url: url.to_string(),
-        links: Vec::new(),
+        links: urls,
     })
 }
 fn extract_title(html: &str) -> Option<String> {
@@ -94,9 +96,37 @@ fn extract_title(html: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    use httpmock::prelude::*;
+
     #[tokio::test]
-    async fn test_fetch_fn() {
-        let result = test_fetch("https://webflow.com/made-in-webflow/links").await;
+    async fn test_crawler_with_mock_response() {
+        // Start a mock HTTP server
+        let server = MockServer::start();
+
+        // Define the mock response for the expected request
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/");
+
+            then.status(200)
+                .header("Content-Type", "text/html; charset=UTF-8")
+                .body("<html><body><a href=\"/link1\">Link 1</a></body></html>");
+        });
+
+        // Call your crawler function
+        let result = crawl_url(&server.url("/")).await;
+
+        dbg!(&result);
+
+        // Ensure mock was hit
+        mock.assert();
+
+        // Verify the extracted links
         assert!(result.is_ok());
+        let extracted_links = result.unwrap();
+        assert_eq!(extracted_links.links.len(), 1);
+        assert_eq!(
+            extracted_links.links[0],
+            format!("{}/link1", server.url(""))
+        );
     }
 }

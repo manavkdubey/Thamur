@@ -69,10 +69,7 @@ mod tests {
             </html>
         "#;
         let base_url = "https://example.com";
-        let expected = vec![
-            "https://example.com/".to_string(),
-            "https://example.com/about".to_string(),
-        ];
+        let expected = vec!["https://example.com/", "https://example.com/about"];
         assert_eq!(parse_html_links(html, base_url).unwrap(), expected);
     }
     #[test]
@@ -91,9 +88,10 @@ mod tests {
 
         let base_url = "http://test.com/extract";
         let expected_urls = vec![
-            "https://example.com/absolute".to_string(),
-            "http://test.com/relative".to_string(),
-            "http://example.com/page".to_string(),
+            "https://example.com/absolute",
+            "http://test.com/relative",
+            "http://example.com/page",
+            "http://test.com/invalid-url",
         ];
 
         let actual_urls = parse_html_links(html, base_url).unwrap();

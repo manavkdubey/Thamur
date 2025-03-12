@@ -6,6 +6,8 @@ pub mod modules {
 }
 pub mod config;
 pub mod error;
+pub mod limiter;
+pub mod robot;
 pub mod storage;
 pub mod task;
 pub mod thread;

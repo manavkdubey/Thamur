@@ -35,6 +35,7 @@ impl UrlValidator {
         if url.as_str().len() > MAX_URL_LENGTH {
             return false;
         }
+
         // Validate scheme
         if !self.scheme_re.is_match(url.scheme()) {
             return false;
@@ -50,6 +51,7 @@ impl UrlValidator {
         if !self.domain_re.is_match(&ascii_domain) || ascii_domain.contains("..") {
             return false;
         }
+
         if let Some(port) = url.port() {
             if (url.scheme() == "http" && port == 80) || (url.scheme() == "https" && port == 443) {
                 return false; // Should not explicitly specify default ports
@@ -66,6 +68,7 @@ impl UrlValidator {
         if !path.starts_with("/") && (url.path().starts_with("..") || url.path().contains("../")) {
             return false;
         }
+
         if let Some(query) = url.query() {
             for param in query.split('&') {
                 if !self.query_re.is_match(param) {
@@ -73,6 +76,7 @@ impl UrlValidator {
                 }
             }
         }
+
         if let Some(fragment) = url.fragment() {
             if !self.fragment_re.is_match(fragment) {
                 return false;
@@ -88,10 +92,6 @@ impl UrlValidator {
     }
     pub fn is_valid_path(&self, path: &str) -> bool {
         if path.is_empty() {
-            return false;
-        }
-
-        if path.starts_with('/') || path.contains("://") {
             return false;
         }
 

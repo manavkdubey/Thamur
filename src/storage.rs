@@ -59,7 +59,7 @@ impl Storage {
             .append(true)
             .open(file_path.clone())?;
 
-        file.write_all(serde_json::to_string(data)?.as_bytes())?;
+        file.write_all(serde_json::to_string_pretty(data)?.as_bytes())?;
         file.write_all(b"\n")?;
 
         tracing::info!("Data successfully saved to: {}", file_path.display());

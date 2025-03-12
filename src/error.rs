@@ -32,6 +32,10 @@ pub enum CrawlerError {
     RwLockWritePoisonError,
     #[error("Other error: {0}")]
     Other(String),
+    #[error("Rate limit exceeded")]
+    RateLimitError(u64),
+    #[error("No token available")]
+    NoTokenAvailable,
 }
 
 impl From<url::ParseError> for CrawlerError {
