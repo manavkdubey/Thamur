@@ -1,3 +1,5 @@
+use clap::{Arg, Command};
+use std::io::Write;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -36,16 +38,45 @@ async fn test_fetch(url: &str) -> Result<CrawledData, Box<dyn std::error::Error>
 }
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let matches = Command::new("Thamur: Rust Web Crawler")
+        .version("1.0")
+        .about("A multi-threaded web crawler written in Rust")
+        .arg(
+            Arg::new("url")
+                .help("The URL to crawl")
+                .required(false)
+                .index(1),
+        );
+
+    let url = match matches.get_matches().get_one::<String>("url") {
+        Some(url) => url.to_owned(),
+        None => {
+            print!("Enter URL to crawl: ");
+            std::io::stdout().flush().unwrap();
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            input.trim().to_string()
+        }
+    };
+
+    // Create a thread pool
     let mut pool = ThreadPool::new(1);
 
     pool.execute(|| async move {
-        crawl_url("http://books.toscrape.com").await;
+        if let Err(e) = crawl_url(&url).await {
+            eprintln!("Error crawling {}: {}", url, e);
+        }
     })
     .await?;
-    pool.execute(|| async move {
-        crawl_url("https://www.robotstxt.org").await;
-    })
-    .await?;
+
+    // pool.execute(|| async move {
+    //     crawl_url("http://books.toscrape.com").await;
+    // })
+    // .await?;
+    // pool.execute(|| async move {
+    //     crawl_url("https://www.robotstxt.org").await;
+    // })
+    // .await?;
 
     pool.shutdown().await;
 
