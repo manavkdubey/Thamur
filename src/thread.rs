@@ -4,15 +4,15 @@ use std::time::Duration;
 use tokio::task;
 pub struct ThreadPool {
     workers: Vec<task::JoinHandle<()>>,
-    task_sender: Sender<Box<dyn Fn() + Send + 'static>>,
+    task_sender: Sender<Box<dyn FnOnce() + Send + 'static>>,
 }
 
 impl ThreadPool {
-    pub fn new() -> Self {
+    pub fn new(workers_size: usize) -> Self {
         let (task_sender, task_receiver) = unbounded();
-        let mut workers = Vec::new();
-        for _ in 0..4 {
-            let task_receiver: Receiver<Box<dyn Fn() + Send + 'static>> = task_receiver.clone();
+        let mut workers = Vec::with_capacity(workers_size);
+        for _ in 0..workers_size {
+            let task_receiver: Receiver<Box<dyn FnOnce() + Send + 'static>> = task_receiver.clone();
             let worker = task::spawn(async move {
                 while let Ok(task) = task_receiver.recv_async().await {
                     task();
@@ -26,11 +26,25 @@ impl ThreadPool {
             task_sender,
         }
     }
-    pub async fn execute<F>(&self, f: F) -> Result<(), SendError<Box<dyn Fn() + Send>>>
+    pub async fn execute<F, Fut>(&self, f: F) -> Result<(), SendError<Box<dyn FnOnce() + Send>>>
     where
-        F: Fn() + Send + 'static,
+        F: FnOnce() -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
     {
-        self.task_sender.send_async(Box::new(f)).await?;
+        let future = f();
+
+        if self.task_sender.is_disconnected() {
+            // ✅ PREVENT SENDING TO DROPPED CHANNEL
+            return Err(SendError(Box::new(|| println!("Channel Disconnected"))));
+            // Return a dummy function to indicate failure
+        }
+
+        self.task_sender
+            .send_async(Box::new(move || {
+                tokio::spawn(future);
+            }))
+            .await?;
+
         Ok(())
     }
 
@@ -70,8 +84,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_thread_pool() {
-        let mut pool = ThreadPool::new();
-        pool.execute(|| println!("Hello from thread!")).await;
+        let mut pool = ThreadPool::new(4);
+        pool.execute(|| async move { println!("Hello from thread!") })
+            .await;
         drop(pool);
         dbg!("pool dropped");
     }

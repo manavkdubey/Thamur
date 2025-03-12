@@ -87,11 +87,27 @@ impl UrlValidator {
         Ok(url)
     }
     pub fn is_valid_path(&self, path: &str) -> bool {
-        if path.is_empty() || !(path.starts_with('/') || path.starts_with('.')) {
+        if path.is_empty() {
             return false;
         }
-        let invalid_chars = [' ', '\\', '"', '<', '>'];
-        !path.chars().any(|c| invalid_chars.contains(&c))
+
+        if path.starts_with('/') || path.contains("://") {
+            return false;
+        }
+
+        let invalid_chars = [' ', '\\', '"', '<', '>', '`', '^', '{', '}', '|'];
+
+        if path.chars().any(|c| invalid_chars.contains(&c)) {
+            return false;
+        }
+
+        let valid_chars = |c: char| c.is_alphanumeric() || "-_.~/".contains(c);
+
+        if !path.chars().all(valid_chars) {
+            return false;
+        }
+
+        true
     }
 }
 

@@ -3,6 +3,32 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use crate::error::CrawlerError;
 use crate::task::Task;
+use dashmap::DashMap;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref GLOBAL_SHARED_STATE: Arc<SharedState> = SharedState::new();
+}
+
+pub fn get_global_instance() -> Arc<SharedState> {
+    GLOBAL_SHARED_STATE.clone()
+}
+
+pub fn is_url_processed(url: &str) -> bool {
+    GLOBAL_SHARED_STATE
+        .visited
+        .read()
+        .unwrap()
+        .contains(&Task::new(url.to_string()))
+}
+
+pub fn mark_url_processed(url: String) {
+    GLOBAL_SHARED_STATE
+        .visited
+        .write()
+        .unwrap()
+        .insert(Task::new(url));
+}
 
 #[derive(Debug)]
 pub struct SharedState {
@@ -23,6 +49,13 @@ impl SharedState {
     pub fn add_url(&self, url: String) -> Result<(), CrawlerError> {
         let mut urls = self.urls.lock()?;
         urls.push_back(Task::CrawlUrl(url));
+        Ok(())
+    }
+    pub fn add_urls(&self, urls: Vec<String>) -> Result<(), CrawlerError> {
+        let mut links = self.urls.lock()?;
+        for url in urls {
+            links.push_back(Task::CrawlUrl(url));
+        }
         Ok(())
     }
 
